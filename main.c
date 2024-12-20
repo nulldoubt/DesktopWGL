@@ -4,7 +4,7 @@
 
 HWND GetWallpaperArea(void);
 
-BOOL CALLBACK FindWorker(HWND wnd, LPARAM lp);
+BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam);
 
 LRESULT CALLBACK WindowProc(HWND hwnd, long uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -94,17 +94,13 @@ HWND GetWallpaperArea() {
     return worker;
 }
 
-BOOL CALLBACK FindWorker(HWND wnd, LPARAM lp) {
-    HWND *pworker = (HWND*)lp;
-
-    if (!FindWindowExA(wnd, 0, "SHELLDLL_DefView", 0)) {
+BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam) {
+    HWND *worker = (HWND*)lParam;
+    if (!FindWindowExA(hwnd, 0, "SHELLDLL_DefView", 0))
         return TRUE;
-    }
-
-    *pworker = FindWindowExA(0, wnd, "WorkerW", 0);
-    if (*pworker)
+    *worker = FindWindowExA(0, hwnd, "WorkerW", 0);
+    if (*worker)
         return FALSE;
-
     return TRUE;
 }
 
