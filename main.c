@@ -32,13 +32,6 @@ int main(void) {
     pfd.cDepthBits = 24;
     pfd.cStencilBits = 8;
 
-    HBRUSH hbr = CreateSolidBrush(RGB(0, 30, 130));
-    if (!hbr) {
-        printf("Failed to create brush\n");
-        ReleaseDC(desktop, hdc);
-        return 1;
-    }
-
     int pixel_format = ChoosePixelFormat(hdc, &pfd);
     if (!pixel_format || !SetPixelFormat(hdc, pixel_format, &pfd)) {
         printf("Failed to set pixel format\n");
