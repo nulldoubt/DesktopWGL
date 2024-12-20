@@ -4,7 +4,7 @@
 
 HWND GetWallpaperArea(void);
 
-BOOL CALLBACK EnumProc(HWND hwnd, LPARAM lParam);
+BOOL CALLBACK FindWorker(HWND wnd, LPARAM lp);
 
 LRESULT CALLBACK WindowProc(HWND hwnd, long uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -68,38 +68,43 @@ int main(void) {
 }
 
 HWND GetWallpaperArea() {
-    HWND desktop = GetDesktopWindow();
-    if (!desktop) {
-        printf("Failed to find desktop window handle\n");
+    HWND worker;
+    HWND progman = GetShellWindow();
+    if (!progman) {
+        printf("Unable to find progman\n");
         return NULL;
     }
 
-    HWND listview = NULL;
-    EnumWindows(EnumProc, (LPARAM) &listview);
-    if (!listview) {
-        printf("Failed to find window\n");
-        return NULL;
+    SendMessageA(progman, 0x052C, 0xD, 0);
+    SendMessageA(progman, 0x052C, 0xD, 1);
+
+    EnumWindows(FindWorker, (LPARAM)&worker);
+
+    if (!worker) {
+        printf("Couldn't spawn WorkerW window, trying old method...\n");
+        SendMessageA(progman, 0x052C, 0, 0);
+        EnumWindows(FindWorker, (LPARAM)&worker);
     }
 
-    return listview;
+    if (!worker) {
+        printf("Couldn't spawn worker, falling back to progman\n");
+        worker = progman;
+    }
+
+    return worker;
 }
 
-BOOL CALLBACK EnumProc(HWND hwnd, LPARAM lParam) {
-    HWND *parentHandle = (HWND *) lParam;
-    char className[256];
-    if (GetClassName(hwnd, className, sizeof(className))) {
-        if (strcmp(className, "WorkerW") == 0) {
-            HWND child = FindWindowEx(hwnd, NULL, "SHELLDLL_DefView", NULL);
-            if (child != NULL) {
-                *parentHandle = hwnd;
-                HWND sysListView = FindWindowEx(child, NULL, "SysListView32", "FolderView");
-                if (sysListView != NULL) {
-                    *(HWND *) lParam = sysListView;
-                    return FALSE;
-                }
-            }
-        }
+BOOL CALLBACK FindWorker(HWND wnd, LPARAM lp) {
+    HWND *pworker = (HWND*)lp;
+
+    if (!FindWindowExA(wnd, 0, "SHELLDLL_DefView", 0)) {
+        return TRUE;
     }
+
+    *pworker = FindWindowExA(0, wnd, "WorkerW", 0);
+    if (*pworker)
+        return FALSE;
+
     return TRUE;
 }
 
