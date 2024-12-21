@@ -2,11 +2,13 @@
 #include <stdio.h>
 #include <gl/gl.h>
 
-HWND GetWallpaperArea(void);
+HWND GetWallpaperArea();
 
 BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam);
 
 void RestoreDesktopWallpaper(void);
+
+int Cleanup(int status, HWND hwnd, HDC hdc, HGLRC hglrc);
 
 int main(void) {
     printf("Starting...\n");
@@ -14,13 +16,13 @@ int main(void) {
     HWND desktop = GetWallpaperArea();
     if (!desktop) {
         printf("Unable to get wallpaper area\n");
-        return 1;
+        return Cleanup(1, NULL, NULL, NULL);
     }
 
     HDC hdc = GetDC(desktop);
     if (!hdc) {
         printf("Failed to get graphics device context\n");
-        return 1;
+        return Cleanup(1, desktop, NULL, NULL);
     }
 
     PIXELFORMATDESCRIPTOR pfd = {0};
@@ -35,25 +37,18 @@ int main(void) {
     int pixel_format = ChoosePixelFormat(hdc, &pfd);
     if (!pixel_format || !SetPixelFormat(hdc, pixel_format, &pfd)) {
         printf("Failed to set pixel format\n");
-        ReleaseDC(desktop, hdc);
-        DestroyWindow(desktop);
-        return 1;
+        return Cleanup(1, desktop, hdc, NULL);
     }
 
     HGLRC hglrc = wglCreateContext(hdc);
     if (!hglrc) {
         printf("Failed to create OpenGL context\n");
-        ReleaseDC(desktop, hdc);
-        DestroyWindow(desktop);
-        return 1;
+        return Cleanup(1, desktop, hdc, NULL);
     }
 
     if (!wglMakeCurrent(hdc, hglrc)) {
         printf("Failed to make context current\n");
-        wglDeleteContext(hglrc);
-        ReleaseDC(desktop, hdc);
-        DestroyWindow(desktop);
-        return 1;
+        return Cleanup(1, desktop, hdc, hglrc);
     }
 
     while (!(GetAsyncKeyState(VK_ESCAPE) & 0x8000)) {
@@ -64,13 +59,7 @@ int main(void) {
         Sleep(16);
     }
 
-    wglMakeCurrent(NULL, NULL);
-    wglDeleteContext(hglrc);
-    ReleaseDC(desktop, hdc);
-
-    RestoreDesktopWallpaper();
-
-    return 0;
+    return Cleanup(0, desktop, hdc, hglrc);
 }
 
 HWND GetWallpaperArea() {
@@ -115,4 +104,16 @@ void RestoreDesktopWallpaper(void) {
 
     SystemParametersInfoA(SPI_SETDESKWALLPAPER, 0, NULL, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
     RedrawWindow(NULL, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
+}
+
+int Cleanup(int status, HWND hwnd, HDC hdc, HGLRC hglrc) {
+    if (hglrc) {
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(hglrc);
+    }
+    if (hdc && hwnd) {
+        ReleaseDC(hwnd, hdc);
+    }
+    RestoreDesktopWallpaper();
+    return status;
 }
