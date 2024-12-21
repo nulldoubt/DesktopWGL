@@ -5,4 +5,4 @@ set(CMAKE_C_STANDARD 17)
 
 add_executable(DesktopWGL main.c)
 
-target_link_libraries(DesktopWGL Opengl32.lib)
+target_link_libraries(DesktopWGL Opengl32 glu32)
