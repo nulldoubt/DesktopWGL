@@ -1,3 +1,6 @@
+#ifndef DESKTOP_WGL
+#define DESKTOP_WGL
+
 #include <Windows.h>
 #include <stdio.h>
 #include <gl/gl.h>
@@ -54,12 +57,10 @@ int main(void) {
     while (!(GetAsyncKeyState(VK_ESCAPE) & 0x8000)) {
         glClearColor(0.33f, 0.5f, 0.25f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-
         if (!SwapBuffers(hdc)) {
             printf("Failed to swap buffers\n");
             break;
         }
-
         Sleep(16);
     }
 
@@ -115,9 +116,10 @@ int Cleanup(int status, HWND hwnd, HDC hdc, HGLRC hglrc) {
         wglMakeCurrent(NULL, NULL);
         wglDeleteContext(hglrc);
     }
-    if (hdc && hwnd) {
+    if (hdc && hwnd)
         ReleaseDC(hwnd, hdc);
-    }
     RestoreDesktopWallpaper();
     return status;
 }
+
+#endif
