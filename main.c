@@ -6,7 +6,7 @@ HWND GetWallpaperArea(void);
 
 BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam);
 
-LRESULT CALLBACK WindowProc(HWND hwnd, long uMsg, WPARAM wParam, LPARAM lParam);
+void RestoreDesktopWallpaper(void);
 
 int main(void) {
     printf("Starting...\n");
@@ -23,7 +23,7 @@ int main(void) {
         return 1;
     }
 
-    PIXELFORMATDESCRIPTOR pfd;
+    PIXELFORMATDESCRIPTOR pfd = {0};
     pfd.nSize = sizeof(pfd);
     pfd.nVersion = 1;
     pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
@@ -36,6 +36,7 @@ int main(void) {
     if (!pixel_format || !SetPixelFormat(hdc, pixel_format, &pfd)) {
         printf("Failed to set pixel format\n");
         ReleaseDC(desktop, hdc);
+        DestroyWindow(desktop);
         return 1;
     }
 
@@ -43,18 +44,20 @@ int main(void) {
     if (!hglrc) {
         printf("Failed to create OpenGL context\n");
         ReleaseDC(desktop, hdc);
+        DestroyWindow(desktop);
         return 1;
     }
 
     if (!wglMakeCurrent(hdc, hglrc)) {
-        printf("Failed to make OpenGL context\n");
+        printf("Failed to make context current\n");
         wglDeleteContext(hglrc);
         ReleaseDC(desktop, hdc);
+        DestroyWindow(desktop);
         return 1;
     }
 
-    while ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) == 0) {
-        glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
+    while (!(GetAsyncKeyState(VK_ESCAPE) & 0x8000)) {
+        glClearColor(0.33f, 0.5f, 0.25f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         SwapBuffers(hdc);
@@ -64,38 +67,35 @@ int main(void) {
     wglMakeCurrent(NULL, NULL);
     wglDeleteContext(hglrc);
     ReleaseDC(desktop, hdc);
+
+    RestoreDesktopWallpaper();
+
     return 0;
 }
 
 HWND GetWallpaperArea() {
-    HWND worker;
-    HWND progman = GetShellWindow();
+    HWND progman = FindWindowA("Progman", NULL);
     if (!progman) {
-        printf("Unable to find progman\n");
+        printf("Progman window not found.\n");
         return NULL;
     }
 
     SendMessageA(progman, 0x052C, 0xD, 0);
     SendMessageA(progman, 0x052C, 0xD, 1);
 
-    EnumWindows(FindWorker, (LPARAM)&worker);
+    HWND worker = NULL;
+    EnumWindows(FindWorker, (LPARAM) &worker);
 
     if (!worker) {
-        printf("Couldn't spawn WorkerW window, trying old method...\n");
-        SendMessageA(progman, 0x052C, 0, 0);
-        EnumWindows(FindWorker, (LPARAM)&worker);
-    }
-
-    if (!worker) {
-        printf("Couldn't spawn worker, falling back to progman\n");
-        worker = progman;
+        printf("Couldn't find WorkerW window, falling back to Progman.\n");
+        return progman;
     }
 
     return worker;
 }
 
 BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam) {
-    HWND *worker = (HWND*)lParam;
+    HWND *worker = (HWND *) lParam;
     if (!FindWindowExA(hwnd, 0, "SHELLDLL_DefView", 0))
         return TRUE;
     *worker = FindWindowExA(0, hwnd, "WorkerW", 0);
@@ -104,16 +104,15 @@ BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam) {
     return TRUE;
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, long uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-        case WM_CLOSE:
-            DestroyWindow(hwnd);
-            break;
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            break;
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+void RestoreDesktopWallpaper(void) {
+    HWND progman = FindWindowA("Progman", NULL);
+    if (!progman) {
+        printf("Failed to find Progman window during restoration.\n");
+        return;
     }
-    return 0;
+
+    SendMessageA(progman, 0x052C, 0, 0);
+
+    SystemParametersInfoA(SPI_SETDESKWALLPAPER, 0, NULL, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+    RedrawWindow(NULL, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE);
 }
