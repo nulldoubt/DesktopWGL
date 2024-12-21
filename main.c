@@ -1,9 +1,15 @@
 #ifndef DESKTOP_WGL
 #define DESKTOP_WGL
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #include <Windows.h>
 #include <stdio.h>
 #include <gl/gl.h>
+#include <gl/glu.h>
+#include <math.h>
 
 HWND GetWallpaperArea();
 
@@ -12,6 +18,25 @@ BOOL CALLBACK FindWorker(HWND hwnd, LPARAM lParam);
 void RestoreDesktopWallpaper(void);
 
 int Cleanup(int status, HWND hwnd, HDC hdc, HGLRC hglrc);
+
+float angle = 0.0f;
+
+void rotatePoint(float pivotX, float pivotY, float *x, float *y, float angle) {
+    float s = sinf(angle * M_PI / 180.0f);
+    float c = cosf(angle * M_PI / 180.0f);
+
+    // Translate point to origin
+    *x -= pivotX;
+    *y -= pivotY;
+
+    // Rotate point
+    float newX = *x * c - *y * s;
+    float newY = *x * s + *y * c;
+
+    // Translate point back
+    *x = newX + pivotX;
+    *y = newY + pivotY;
+}
 
 int main(void) {
     printf("Starting...\n");
@@ -54,9 +79,42 @@ int main(void) {
         return Cleanup(1, desktop, hdc, hglrc);
     }
 
-    while (!(GetAsyncKeyState(VK_ESCAPE) & 0x8000)) {
+    const GLubyte *version = glGetString(GL_VERSION);
+    if (version)
+        printf("OpenGL Version: %s\n", version);
+    else
+        printf("Failed to retrieve OpenGL version.\n"); {
         glClearColor(0.33f, 0.5f, 0.25f, 1.0f);
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluOrtho2D(0, 1920, 0, 1080);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+    }
+
+    float center_x = 960.0f;
+    float center_y = 540.0f;
+
+    while (!(GetAsyncKeyState(VK_ESCAPE) & 0x8000)) {
+        angle -= 2.5f;
+
         glClear(GL_COLOR_BUFFER_BIT);
+        glLoadIdentity();
+
+        glBegin(GL_LINE_STRIP);
+        for (float i = 0; i < 10 * M_PI; i += 0.1f) {
+            float x = center_x + (i * 10) * cosf(i);
+            float y = center_y + (i * 10) * sinf(i);
+
+            rotatePoint(center_x, center_y, &x, &y, angle);
+
+            glColor3f(fmodf(i, 1.0f), fmodf(i * 0.5f, 1.0f), fmodf(i * 0.25f, 1.0f));
+            glVertex2f(x, y);
+        }
+        glEnd();
+
         if (!SwapBuffers(hdc)) {
             printf("Failed to swap buffers\n");
             break;
