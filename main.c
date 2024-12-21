@@ -55,7 +55,11 @@ int main(void) {
         glClearColor(0.33f, 0.5f, 0.25f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        SwapBuffers(hdc);
+        if (!SwapBuffers(hdc)) {
+            printf("Failed to swap buffers\n");
+            break;
+        }
+
         Sleep(16);
     }
 
